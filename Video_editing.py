@@ -9,7 +9,8 @@ import json
 import re
 import os
 import random
-from Sub_like_submagic import add_subtitles_to_video
+from pydrive.auth import GoogleAuth
+from pydrive.drive import GoogleDrive
 
 def get_video_duration(youtube_url):
     try:
@@ -468,17 +469,65 @@ def overlay_videos(background_path, output_path, mp4videoURL=".", path_string ="
     background_video.close()
     overlay_video.close()
 
+def extract_satisfying():
+    # Authentification
+    gauth = GoogleAuth()
+    gauth.LocalWebserverAuth()  # Autoriser l'authentification via le navigateur
+
+    # Initialiser l'objet GoogleDrive
+    drive = GoogleDrive(gauth)
+
+    # ID du dossier "Vidéo_satisfaisante" dans Google Drive
+    folder_name = "Vidéo_satisfaisante"
+
+    # Rechercher le dossier par son nom
+    folder_query = f"title='{folder_name}' and mimeType='application/vnd.google-apps.folder' and trashed=false"
+    folder_list = drive.ListFile({'q': folder_query}).GetList()
+
+    if len(folder_list) == 1:
+        selected_folder = folder_list[0]
+        folder_id = selected_folder['id']
+
+        # Récupérer la liste des vidéos non supprimées dans le dossier spécifié
+        folder_query = f"'{folder_id}' in parents and mimeType contains 'video/' and trashed=false"
+        folder_files = drive.ListFile({'q': folder_query}).GetList()
+
+        if len(folder_files) > 0:
+            # Choisir une vidéo au hasard
+            random_video = random.choice(folder_files)
+
+            # Spécifier le chemin de destination pour le téléchargement
+            destination_folder = os.path.dirname(os.path.abspath(__file__))
+
+            # Créer le répertoire de destination s'il n'existe pas
+            os.makedirs(destination_folder, exist_ok=True)
+
+            # Nom de fichier local souhaité
+            local_filename = "satisfaisant.mp4"
+
+            # Télécharger la vidéo dans le répertoire de destination avec le nom souhaité
+            destination_path = os.path.join(destination_folder, local_filename)
+            random_video.GetContentFile(destination_path)
+            print(f"Vidéo téléchargée avec succès sous le nom '{local_filename}'.")
+            return (local_filename)
+        else:
+            print("Aucune vidéo trouvée dans le dossier spécifié.")
+    else:
+        print("Dossier spécifié non trouvé ou multiple dossiers trouvés.")
+
+
 
 if __name__ == "__main__":
+    #Recupère la video background dans le drive
+    satisfying_flname = extract_satisfying()
 
     # Entrer le lien de la vidéo YouTube
     video_url = input("Entrez le lien de la vidéo YouTube : ")
     path_string = input("Entrez le texte du chemin SVG : ")
 
     # Chemins d'accès aux vidéos
-    background_video_path = "satisfying2.mp4"
+    background_video_path = satisfying_flname
 
     # Chemin de sortie pour la vidéo résultante
-    output_path = "superposed_video.mp4"
-
+    output_path = "output.mp4"
     overlay_videos(background_video_path, output_path, video_url, path_string)
