@@ -90,12 +90,11 @@ def get_intervals65sec(video_duration, path_data):
     # Afficher les intervalles de 1min05 autour des points bas sous forme de barres verticales
     intervals = []
     for i in range(num_bottom_points):
-        start_time = round(bottom_points_x[i] - 65/2.0, 0)
-        end_time = round(bottom_points_x[i] + 65/2.0, 0)
+        start_time = round(bottom_points_x[i] - 20, 0)
+        end_time = round(bottom_points_x[i] + 45, 0)
         intervals.append((start_time, end_time))
 
     return intervals
-
 
 def plot_svg_curve_with_intervals(video_url, path_string):
     # Obtenir la durée de la vidéo à partir du lien
@@ -164,8 +163,6 @@ def plot_svg_curve_with_intervals(video_url, path_string):
     plt.grid(True)
     plt.tight_layout()  # Pour éviter que le titre soit tronqué
     plt.show()
-
-
 
 def download_youtube_video(video_url):
     try:
@@ -423,6 +420,7 @@ def overlay_videos(background_path, output_path, mp4videoURL=".", path_string ="
     if duration_asked_end > maxduration:
         # Adjust duration_asked_end if it exceeds the total duration
         duration_asked_end = maxduration
+        duration_asked_start = duration_asked_start - 65
 
     # Check if the difference between duration_asked_end and duration_asked_start is equal to duration_asked
     if duration_asked_end - duration_asked_start != duration_asked:
@@ -453,7 +451,7 @@ def overlay_videos(background_path, output_path, mp4videoURL=".", path_string ="
 
     # Calculer les coordonnées pour centrer la superposition en haut de l'arrière-plan
     overlay_x = (background_width - overlay_width) // 2
-    overlay_y = 0  # Placer la vidéo en haut
+    overlay_y = (background_height - overlay_height) // 2
 
     if sbtl is True:
         all_linelevel_splits = add_subtitles_to_video("ytb_path.mp4")
@@ -461,8 +459,6 @@ def overlay_videos(background_path, output_path, mp4videoURL=".", path_string ="
         video_with_overlay = CompositeVideoClip([background_video, overlay_video.set_position((overlay_x, overlay_y))] + all_linelevel_splits, use_bgclip=True)
 
     else :
-        background_video = background_video.subclip(start_time1, end_time1)
-        overlay_video = overlay_video.subclip(start_time1, end_time1)
         video_with_overlay = CompositeVideoClip([background_video, overlay_video.set_position((overlay_x, overlay_y))], use_bgclip=True)
 
     # Sauvegarder la vidéo résultante
@@ -480,7 +476,7 @@ if __name__ == "__main__":
     path_string = input("Entrez le texte du chemin SVG : ")
 
     # Chemins d'accès aux vidéos
-    background_video_path = "satisfying1.mp4"
+    background_video_path = "satisfying2.mp4"
 
     # Chemin de sortie pour la vidéo résultante
     output_path = "superposed_video.mp4"
