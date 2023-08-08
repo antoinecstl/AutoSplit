@@ -479,7 +479,7 @@ def overlay_videos(background_path, output_path, mp4videoURL="."):
         overlay_y = (background_height - overlay_height) // 2
 
     else :
-        overlay_y = (background_height)
+        overlay_y = background_height
 
     if sbtl is True:
         all_linelevel_splits = add_subtitles_to_video("ytb_path.mp4")
