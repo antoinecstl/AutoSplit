@@ -217,7 +217,7 @@ def overlay_videos(background_path, output_path, mp4videoURL="."):
     elif choice_subtitle == 1 :
         sbtl = True
 
-    def add_subtitles_to_video(video_path: str, text_color, highlight_text_color, highlight_bg_color):
+    def add_subtitles_to_video(video_path: str):
         """Ajoute des sous-titres à une vidéo"""
         try:
             start_time_str = str(start_time1)
@@ -301,7 +301,7 @@ def overlay_videos(background_path, output_path, mp4videoURL="."):
             for line in linelevel_subtitles:
                 json_str = json.dumps(line, indent=4)
 
-            def create_caption(textJSON, framesize, font="LilitaOne-Regular.ttf", color=text_color, highlight_color=highlight_text_color, bgcolor=highlight_bg_color):
+            def create_caption(textJSON, framesize, font="LilitaOne-Regular.ttf", color="black", highlight_color="white", bgcolor="blue"):
                 wordcount = len(textJSON['textcontents'])
                 full_duration = textJSON['end'] - textJSON['start']
 
@@ -482,10 +482,7 @@ def overlay_videos(background_path, output_path, mp4videoURL="."):
         overlay_y = background_height
 
     if sbtl is True:
-        text_color = str(input("Couleur du texte de base en HEXA ou couleur de base : "))
-        text_higlight_color = str(input("Couleur du texte highlight en HEXA ou couleur de base : "))
-        bg_color = str(input("Couleur du background de l'highlight en HEXA ou couleur de base : "))
-        all_linelevel_splits = add_subtitles_to_video("ytb_path.mp4", text_color, text_higlight_color, bg_color)
+        all_linelevel_splits = add_subtitles_to_video("ytb_path.mp4")
 
         # Superposer la vidéo de superposition sur l'arrière-plan
         video_with_overlay = CompositeVideoClip([background_video, overlay_video.set_position((overlay_x, overlay_y))] + all_linelevel_splits, use_bgclip=True)
