@@ -11,6 +11,7 @@ import os
 import random
 from pydrive.auth import GoogleAuth
 from pydrive.drive import GoogleDrive
+import string
 
 def get_video_duration(youtube_url):
     try:
@@ -182,20 +183,34 @@ def download_youtube_video(video_url):
         print(f"Une erreur s'est produite : {e}")
 
 
-def overlay_videos(background_path, output_path, mp4videoURL=".", path_string ="."):
+def overlay_videos(background_path, output_path, mp4videoURL="."):
 
-    path_data = parse_coordinates(path_string)
-    duration = get_video_duration(mp4videoURL)
-    intervals = get_intervals65sec(duration, path_data)
-    print(intervals)
 
-    i = int(input("Rentrez l'intervalle souhaité entre 1 et 6 : "))
+    heatmap = 12
 
-    start_time1 = intervals[i-1][0]
-    end_time1 = intervals[i-1][1]
+    while heatmap != 0 and heatmap != 1 :
+        heatmap = int(input("Avez vous une Heatmap (1 = Oui, 0 = Non) : "))
+
+    if heatmap == 1 :
+        path_string = input("Entrez le SVG de la Heatmap : ")
+
+        path_data = parse_coordinates(path_string)
+        duration = get_video_duration(mp4videoURL)
+        intervals = get_intervals65sec(duration, path_data)
+        print(intervals)
+
+        i = int(input("Rentrez l'intervalle souhaité entre 1 et 6 : "))
+
+        start_time1 = intervals[i-1][0]
+        end_time1 = intervals[i-1][1]
+
+    else :
+        start_time1 = int(input("Donnée le temps en seconde du début de video : "))
+        end_time1 = start_time1 + 65
+
     print(start_time1, end_time1)
 
-    choice_subtitle = int(input("Voulez vous des sous titres dans votre video (1 pour oui, 0 pour non) :"))
+    choice_subtitle = int(input("Voulez vous des sous titres dans votre video (1 pour oui, 0 pour non) : "))
 
     if choice_subtitle == 0 :
         sbtl = False
@@ -444,7 +459,7 @@ def overlay_videos(background_path, output_path, mp4videoURL=".", path_string ="
 
     # Redimensionner la vidéo téléchargée pour correspondre à la largeur de l'arrière-plan
     overlay_video = VideoFileClip("ytb_path.mp4").subclip(start_time1, end_time1)
-    overlay_video = overlay_video.resize(width=background_video.w + 150)
+    overlay_video = overlay_video.resize(width=background_video.w + 160)
 
     # Récupérer les dimensions de l'arrière-plan et de la superposition
     background_width, background_height = background_video.size
@@ -452,7 +467,19 @@ def overlay_videos(background_path, output_path, mp4videoURL=".", path_string ="
 
     # Calculer les coordonnées pour centrer la superposition en haut de l'arrière-plan
     overlay_x = (background_width - overlay_width) // 2
-    overlay_y = (background_height - overlay_height) // 2
+
+    y_position = 100
+    while y_position != 1 and y_position != 2 and y_position != 3 :
+        y_position = int(input("Choisissez le positionnement de la video : (1 - Haut, 2 - Milieu, 3 - Bas) : "))
+
+    if y_position == 1 :
+        overlay_y = 0
+
+    elif y_position == 2 :
+        overlay_y = (background_height - overlay_height) // 2
+
+    else :
+        overlay_y = (background_height)
 
     if sbtl is True:
         all_linelevel_splits = add_subtitles_to_video("ytb_path.mp4")
@@ -509,7 +536,7 @@ def extract_satisfying():
             destination_path = os.path.join(destination_folder, local_filename)
             random_video.GetContentFile(destination_path)
             print(f"Vidéo téléchargée avec succès sous le nom '{local_filename}'.")
-            return (local_filename)
+            return (local_filename, drive)
         else:
             print("Aucune vidéo trouvée dans le dossier spécifié.")
     else:
@@ -519,15 +546,32 @@ def extract_satisfying():
 
 if __name__ == "__main__":
     #Recupère la video background dans le drive
-    satisfying_flname = extract_satisfying()
+    satisfying_flname, drive = extract_satisfying()
 
     # Entrer le lien de la vidéo YouTube
     video_url = input("Entrez le lien de la vidéo YouTube : ")
-    path_string = input("Entrez le texte du chemin SVG : ")
 
     # Chemins d'accès aux vidéos
     background_video_path = satisfying_flname
 
     # Chemin de sortie pour la vidéo résultante
     output_path = "output.mp4"
-    overlay_videos(background_video_path, output_path, video_url, path_string)
+    overlay_videos(background_video_path, output_path, video_url)
+
+
+    # Chemin dans Google Drive où enregistrer la vidéo
+    drive_folder_id = '1JUVVFnhPp0Bl7uCrAFlzwE_2z0Z8t3xj'
+
+    random_string = ''.join(random.choices(string.ascii_letters + string.digits, k=8))
+
+    part_filename = f'part_{random_string}".mp4"'
+    part_path = "output.mp4"
+
+    # Création d'un fichier dans Google Drive
+    file_drive = drive.CreateFile({'title': part_filename, 'parents': [{'id': drive_folder_id}]})
+
+    # Attachez le contenu du fichier local au fichier Google Drive
+    file_drive.SetContentFile(part_path)
+
+    # Téléversement du fichier vers Google Drive
+    file_drive.Upload()
