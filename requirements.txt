@@ -6,3 +6,5 @@ numpy: 1.25.2
 ffmpeg-python: 0.2.0
 requests: 2.31.0
 Pillow: 9.5.0
+oauth2client
+google-api-python-client
