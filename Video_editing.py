@@ -2,6 +2,9 @@ from faster_whisper import WhisperModel
 from moviepy.editor import TextClip, VideoFileClip, CompositeVideoClip, ColorClip, concatenate_videoclips
 from pytube import YouTube
 import matplotlib.pyplot as plt
+from googleapiclient.discovery import build
+from googleapiclient.http import MediaIoBaseDownload, MediaFileUpload
+from oauth2client.service_account import ServiceAccountCredentials
 import numpy as np
 import ffmpeg
 import requests
@@ -9,9 +12,8 @@ import json
 import re
 import os
 import random
-from pydrive.auth import GoogleAuth
-from pydrive.drive import GoogleDrive
 import string
+import io
 
 def get_video_duration(youtube_url):
     try:
@@ -183,11 +185,12 @@ def download_youtube_video(video_url):
         print(f"Une erreur s'est produite : {e}")
 
 
-def overlay_videos(background_path, output_path, mp4videoURL="."):
+def overlay_videos(mp4videoURL="."):
 
+    # Entrer le lien de la vidéo YouTube
+    video_url = input("Entrez le lien de la vidéo YouTube : ")
 
     heatmap = 12
-
     while heatmap != 0 and heatmap != 1 :
         heatmap = int(input("Avez vous une Heatmap (1 = Oui, 0 = Non) : "))
 
@@ -217,7 +220,7 @@ def overlay_videos(background_path, output_path, mp4videoURL="."):
     elif choice_subtitle == 1 :
         sbtl = True
 
-    def add_subtitles_to_video(video_path: str):
+    def add_subtitles_to_video(video_path: str, text_color, highlight_text_color, highlight_bg_color):
         """Ajoute des sous-titres à une vidéo"""
         try:
             start_time_str = str(start_time1)
@@ -301,7 +304,7 @@ def overlay_videos(background_path, output_path, mp4videoURL="."):
             for line in linelevel_subtitles:
                 json_str = json.dumps(line, indent=4)
 
-            def create_caption(textJSON, framesize, font="LilitaOne-Regular.ttf", color="black", highlight_color="white", bgcolor="blue"):
+            def create_caption(textJSON, framesize, font="LilitaOne-Regular.ttf", color=text_color, highlight_color=highlight_text_color, bgcolor=highlight_bg_color):
                 wordcount = len(textJSON['textcontents'])
                 full_duration = textJSON['end'] - textJSON['start']
 
@@ -413,11 +416,22 @@ def overlay_videos(background_path, output_path, mp4videoURL="."):
         except Exception as e:
             raise e
 
+    y_position = 100
+    while y_position != 1 and y_position != 2 and y_position != 3:
+        y_position = int(input("Choisissez le positionnement de la video : (1 - Haut, 2 - Milieu, 3 - Bas) : "))
 
     # Télécharger la vidéo YouTube
+    print("Téléchargement de la video ytb")
     download_youtube_video(mp4videoURL)
 
     # Charger la vidéo d'arrière-plan
+    print("Téléchargement de la video Satisfaisante")
+    extract_satisfying()
+    satisfying_flname = "satisfaisant.mp4"
+    background_path = satisfying_flname
+
+    # Chemin de sortie pour la vidéo résultante
+    output_path = "output.mp4"
     background_video = VideoFileClip(background_path)
     maxduration = background_video.duration
 
@@ -438,8 +452,12 @@ def overlay_videos(background_path, output_path, mp4videoURL="."):
         duration_asked_end = maxduration
         duration_asked_start = duration_asked_start - 65
 
+    print(duration_asked)
+    diff = duration_asked_end - duration_asked_start
+    diff = round(diff, 1)
+
     # Check if the difference between duration_asked_end and duration_asked_start is equal to duration_asked
-    if duration_asked_end - duration_asked_start != duration_asked:
+    if diff != duration_asked:
         raise ValueError("Invalid random subclip range")
 
     # Extract the random subclip from the background video
@@ -459,7 +477,7 @@ def overlay_videos(background_path, output_path, mp4videoURL="."):
 
     # Redimensionner la vidéo téléchargée pour correspondre à la largeur de l'arrière-plan
     overlay_video = VideoFileClip("ytb_path.mp4").subclip(start_time1, end_time1)
-    overlay_video = overlay_video.resize(width=background_video.w + 160)
+    overlay_video = overlay_video.resize(width=background_video.w + 400)
 
     # Récupérer les dimensions de l'arrière-plan et de la superposition
     background_width, background_height = background_video.size
@@ -468,10 +486,6 @@ def overlay_videos(background_path, output_path, mp4videoURL="."):
     # Calculer les coordonnées pour centrer la superposition en haut de l'arrière-plan
     overlay_x = (background_width - overlay_width) // 2
 
-    y_position = 100
-    while y_position != 1 and y_position != 2 and y_position != 3 :
-        y_position = int(input("Choisissez le positionnement de la video : (1 - Haut, 2 - Milieu, 3 - Bas) : "))
-
     if y_position == 1 :
         overlay_y = 0
 
@@ -479,10 +493,13 @@ def overlay_videos(background_path, output_path, mp4videoURL="."):
         overlay_y = (background_height - overlay_height) // 2
 
     else :
-        overlay_y = background_height
+        overlay_y = background_height - overlay_height
 
-    if sbtl is True:
-        all_linelevel_splits = add_subtitles_to_video("ytb_path.mp4")
+    if sbtl:
+        text_color = str(input("Couleur du texte de base en HEXA ou couleur de base : "))
+        text_higlight_color = str(input("Couleur du texte highlight en HEXA ou couleur de base : "))
+        bg_color = str(input("Couleur du background de l'highlight en HEXA ou couleur de base : "))
+        all_linelevel_splits = add_subtitles_to_video("ytb_path.mp4", text_color, text_higlight_color, bg_color)
 
         # Superposer la vidéo de superposition sur l'arrière-plan
         video_with_overlay = CompositeVideoClip([background_video, overlay_video.set_position((overlay_x, overlay_y))] + all_linelevel_splits, use_bgclip=True)
@@ -491,88 +508,108 @@ def overlay_videos(background_path, output_path, mp4videoURL="."):
         video_with_overlay = CompositeVideoClip([background_video, overlay_video.set_position((overlay_x, overlay_y))], use_bgclip=True)
 
     # Sauvegarder la vidéo résultante
-    video_with_overlay.write_videofile(output_path, fps=24, codec='h264_nvenc', audio_codec='aac', threads=100)
+    video_with_overlay.write_videofile(output_path, fps=24, codec='libx264', audio_codec='aac')
 
     # Fermer les clips vidéo
     background_video.close()
     overlay_video.close()
+    drive_folder_id = drive_upload()
+    drive_folder_url = f"https://drive.google.com/drive/u/1/folders/{drive_folder_id}"
+    message = f"Your video is finished !\n\n Here is the directory adress : {drive_folder_url}"
+    print(message)
 
 def extract_satisfying():
-    # Authentification
-    gauth = GoogleAuth()
-    gauth.LocalWebserverAuth()  # Autoriser l'authentification via le navigateur
+    class GoogleDriveService:
+        def __init__(self):
+            self._SCOPES = ['https://www.googleapis.com/auth/drive']
 
-    # Initialiser l'objet GoogleDrive
-    drive = GoogleDrive(gauth)
+            _base_path = os.path.dirname(__file__)
+            _credential_path = os.path.join(_base_path, 'credential.json')
+            os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = _credential_path
+
+        def build(self):
+            creds = ServiceAccountCredentials.from_json_keyfile_name(os.getenv("GOOGLE_APPLICATION_CREDENTIALS"), self._SCOPES)
+            service = build('drive', 'v3', credentials=creds)
+            return service
+
+    # Créer une instance du service Google Drive
+    drive_service = GoogleDriveService()
+    service = drive_service.build()
 
     # ID du dossier "Vidéo_satisfaisante" dans Google Drive
     folder_name = "Vidéo_satisfaisante"
 
     # Rechercher le dossier par son nom
-    folder_query = f"title='{folder_name}' and mimeType='application/vnd.google-apps.folder' and trashed=false"
-    folder_list = drive.ListFile({'q': folder_query}).GetList()
+    folder_query = f"name='{folder_name}' and mimeType='application/vnd.google-apps.folder' and trashed=false"
+    folder_results = service.files().list(q=folder_query).execute()
+    folder_items = folder_results.get('files', [])
 
-    if len(folder_list) == 1:
-        selected_folder = folder_list[0]
-        folder_id = selected_folder['id']
+    if len(folder_items) == 1:
+        folder_id = folder_items[0]['id']
 
         # Récupérer la liste des vidéos non supprimées dans le dossier spécifié
-        folder_query = f"'{folder_id}' in parents and mimeType contains 'video/' and trashed=false"
-        folder_files = drive.ListFile({'q': folder_query}).GetList()
+        video_query = f"'{folder_id}' in parents and mimeType contains 'video/' and trashed=false"
+        video_results = service.files().list(q=video_query).execute()
+        video_items = video_results.get('files', [])
 
-        if len(folder_files) > 0:
+        if len(video_items) > 0:
             # Choisir une vidéo au hasard
-            random_video = random.choice(folder_files)
+            random_video = random.choice(video_items)
 
-            # Spécifier le chemin de destination pour le téléchargement
-            destination_folder = os.path.dirname(os.path.abspath(__file__))
+            # Télécharger la vidéo
+            request = service.files().get_media(fileId=random_video['id'])
+            fh = io.FileIO("satisfaisant.mp4", 'wb')
+            downloader = MediaIoBaseDownload(fh, request)
+            done = False
+            while not done:
+                status, done = downloader.next_chunk()
 
-            # Créer le répertoire de destination s'il n'existe pas
-            os.makedirs(destination_folder, exist_ok=True)
-
-            # Nom de fichier local souhaité
-            local_filename = "satisfaisant.mp4"
-
-            # Télécharger la vidéo dans le répertoire de destination avec le nom souhaité
-            destination_path = os.path.join(destination_folder, local_filename)
-            random_video.GetContentFile(destination_path)
-            print(f"Vidéo téléchargée avec succès sous le nom '{local_filename}'.")
-            return (local_filename, drive)
+            print(f"Vidéo téléchargée avec succès sous le nom '{fh.name}'.")
         else:
             print("Aucune vidéo trouvée dans le dossier spécifié.")
     else:
-        print("Dossier spécifié non trouvé ou multiple dossiers trouvés.")
+        print("Dossier spécifié non trouvé ou plusieurs dossiers trouvés.")
 
+def drive_upload():
+    class GoogleDriveService:
+        def __init__(self):
+            self._SCOPES = ['https://www.googleapis.com/auth/drive']
 
+            _base_path = os.path.dirname(__file__)
+            _credential_path = os.path.join(_base_path, 'credential.json')
+            os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = _credential_path
 
-if __name__ == "__main__":
-    #Recupère la video background dans le drive
-    satisfying_flname, drive = extract_satisfying()
+        def build(self):
+            creds = ServiceAccountCredentials.from_json_keyfile_name(os.getenv("GOOGLE_APPLICATION_CREDENTIALS"),self._SCOPES)
+            service = build('drive', 'v3', credentials=creds)
+            return service
 
-    # Entrer le lien de la vidéo YouTube
-    video_url = input("Entrez le lien de la vidéo YouTube : ")
+    # Créer une instance du service Google Drive
+    drive_service = GoogleDriveService()
+    service = drive_service.build()
 
-    # Chemins d'accès aux vidéos
-    background_video_path = satisfying_flname
+    # Chemin local du fichier à téléverser
+    local_file_path = "output.mp4"
 
-    # Chemin de sortie pour la vidéo résultante
-    output_path = "output.mp4"
-    overlay_videos(background_video_path, output_path, video_url)
-
-
-    # Chemin dans Google Drive où enregistrer la vidéo
+    # ID du dossier dans Google Drive où enregistrer le fichier
     drive_folder_id = '1JUVVFnhPp0Bl7uCrAFlzwE_2z0Z8t3xj'
 
+    # Générer un nom de fichier aléatoire pour le fichier à téléverser
     random_string = ''.join(random.choices(string.ascii_letters + string.digits, k=8))
+    part_filename = f'part_{random_string}.mp4'
 
-    part_filename = f'part_{random_string}".mp4"'
-    part_path = "output.mp4"
+    # Création d'un objet MediaFileUpload pour téléverser le fichier
+    media = MediaFileUpload(local_file_path, mimetype='video/mp4')
 
-    # Création d'un fichier dans Google Drive
-    file_drive = drive.CreateFile({'title': part_filename, 'parents': [{'id': drive_folder_id}]})
+    # Création d'un fichier dans Google Drive avec le contenu téléversé
+    file_drive = service.files().create(
+        body={'name': part_filename, 'parents': [drive_folder_id]},
+        media_body=media,
+        fields='id'
+    ).execute()
 
-    # Attachez le contenu du fichier local au fichier Google Drive
-    file_drive.SetContentFile(part_path)
+    return (drive_folder_id)
 
-    # Téléversement du fichier vers Google Drive
-    file_drive.Upload()
+if __name__ == "__main__":
+
+    overlay_videos()
