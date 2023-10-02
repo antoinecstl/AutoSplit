@@ -179,8 +179,9 @@ def download_youtube_video(video_url):
         # Télécharger la vidéo dans le dossier de sortie spécifié
         print("Téléchargement en cours...")
         video_stream.download(filename="ytb_path.mp4")
-
+        vid_dur = get_video_duration(video_url)
         print("Téléchargement terminé !")
+        return vid_dur
     except Exception as e:
         print(f"Une erreur s'est produite : {e}")
 
